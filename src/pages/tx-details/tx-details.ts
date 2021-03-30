@@ -102,9 +102,8 @@ export class TxDetailsModal {
     let match = false;
     if (
       type == 'NewBlock' &&
-      n &&
-      n.data &&
       this.wallet &&
+      n &&
       n.data &&
       n.data.network == this.wallet.network &&
       n.data.coin == this.wallet.coin

@@ -53,6 +53,7 @@ import { AddFundsPage } from '../onboarding/add-funds/add-funds';
 import { AmountPage } from '../send/amount/amount';
 import { AltCurrencyPage } from '../settings/alt-currency/alt-currency';
 import { BitPayIdPage } from '../settings/bitpay-id/bitpay-id';
+import { TokenSwapPage } from '../token-swap/token-swap';
 
 export interface Advertisement {
   name: string;
@@ -895,6 +896,15 @@ export class HomePage {
 
   public goToWalletConnectPage() {
     this.navCtrl.push(WalletConnectPage);
+  }
+
+  public goToTokenSwapPage() {
+    // this.analyticsProvider.logEvent('token_swap_button_clicked', {
+    //   from: 'homePage'
+    // });
+    this.navCtrl.push(TokenSwapPage, {
+      currency: this.configProvider.get().wallet.settings.alternativeIsoCode
+    });
   }
 
   private checkNewRelease() {
