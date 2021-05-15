@@ -267,29 +267,25 @@ export class SelectInputsPage {
   }
 
   private checkCoinAndNetwork(data): boolean {
-    const addrData = this.addressProvider.getCoinAndNetwork(
+    const validation = this.addressProvider.checkCoinAndNetwork(
       data,
-      this.wallet.network
+      this.wallet.network,
+      this.wallet.coin
     );
-    const isValid =
-      this.currencyProvider.getChain(this.wallet.coin).toLowerCase() ==
-        addrData.coin && addrData.network == this.wallet.network;
 
-    if (isValid) {
+    if (!!validation.isValid) {
       this.invalidAddress = false;
       return true;
     } else {
       this.invalidAddress = true;
-      const network = addrData.network;
-
-      if (this.wallet.coin === 'bch' && this.wallet.network === network) {
-        const isLegacy = this.checkIfLegacy();
-        isLegacy ? this.showLegacyAddrMessage() : this.showErrorMessage();
+      if (!!validation.isLegacy) {
+        this.showLegacyAddrMessage();
       } else {
-        this.showErrorMessage();
+        if (!!validation.showError) {
+          this.showErrorMessage();
+        }
       }
     }
-
     return false;
   }
 
@@ -320,15 +316,6 @@ export class SelectInputsPage {
         this.processInput();
       }
     });
-  }
-
-  private checkIfLegacy(): boolean {
-    return (
-      this.incomingDataProvider.isValidBitcoinCashLegacyAddress(this.search) ||
-      this.incomingDataProvider.isValidBitcoinCashUriWithLegacyAddress(
-        this.search
-      )
-    );
   }
 
   public addRecipient(recipient): void {

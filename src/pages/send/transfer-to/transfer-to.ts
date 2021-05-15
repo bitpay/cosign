@@ -16,7 +16,6 @@ import {
   CurrencyProvider
 } from '../../../providers/currency/currency';
 import { Logger } from '../../../providers/logger/logger';
-import { PlatformProvider } from '../../../providers/platform/platform';
 import { PopupProvider } from '../../../providers/popup/popup';
 import { ProfileProvider } from '../../../providers/profile/profile';
 import { WalletProvider } from '../../../providers/wallet/wallet';
@@ -67,7 +66,6 @@ export class TransferToPage {
   public updatingContactsList: boolean = false;
   public itemTapped: boolean = false;
 
-  private _delayTimeOut: number = 700;
   private _fromSelectInputs: boolean;
   private _fromMultiSend: boolean;
 
@@ -82,7 +80,6 @@ export class TransferToPage {
     private walletProvider: WalletProvider,
     private addressBookProvider: AddressBookProvider,
     private logger: Logger,
-    private platformProvider: PlatformProvider,
     private popupProvider: PopupProvider,
     private addressProvider: AddressProvider,
     private viewCtrl: ViewController,
@@ -93,10 +90,6 @@ export class TransferToPage {
       this.wallets[coin] = this.profileProvider.getWallets({ coin });
       this.hasWallets[coin] = !_.isEmpty(this.wallets[coin]);
     }
-    this._delayTimeOut =
-      this.platformProvider.isIOS || this.platformProvider.isAndroid
-        ? 700
-        : 100;
   }
 
   @Input()
@@ -111,7 +104,7 @@ export class TransferToPage {
       _.groupBy(this.walletList[this._wallet.coin], 'keyId')
     );
 
-    this.delayUpdateContactsList(this._delayTimeOut);
+    this.delayUpdateContactsList();
   }
 
   get wallet() {
@@ -180,38 +173,51 @@ export class TransferToPage {
       .filter(wallet => this.filterIrrelevantRecipients(wallet));
   }
 
-  delayUpdateContactsList(delayTime: number = 700) {
+  delayUpdateContactsList() {
     if (this.updatingContactsList) return;
     this.updatingContactsList = true;
-    setTimeout(() => {
-      this.updateContactsList();
-      this.updatingContactsList = false;
-    }, delayTime || 700);
+    this.updateContactsList();
+    this.updatingContactsList = false;
   }
 
   private updateContactsList(): void {
     this.addressBookProvider.list().then(ab => {
       this.hasContacts = _.isEmpty(ab) ? false : true;
       if (!this.hasContacts) return;
-
+      this.logger.debug(
+        `====== ${this.wallet.network} - contacts ${JSON.stringify(ab)}`
+      );
       let contactsList = [];
       _.each(ab, (v, k: string) => {
-        const addrData = this.addressProvider.getCoinAndNetwork(k);
-        contactsList.push({
-          name: _.isObject(v) ? v.name : v,
-          address: k,
-          network: addrData.network,
-          email: _.isObject(v) ? v.email : null,
-          recipientType: 'contact',
-          coin: addrData.coin,
-          getAddress: () => Promise.resolve(k),
-          destinationTag: v.tag
-        });
+        const addrData = this.addressProvider.getCoinAndNetwork(
+          k,
+          this.wallet.network
+        );
+        this.logger.debug(
+          `====== addDrata ${
+            addrData
+              ? JSON.stringify(addrData)
+              : k + 'is not ' + this.wallet.network
+          }`
+        );
+        if (addrData && addrData.coin === this.wallet.coin) {
+          contactsList.push({
+            name: _.isObject(v) ? v.name : v,
+            address: k,
+            network: addrData.network,
+            email: _.isObject(v) ? v.email : null,
+            recipientType: 'contact',
+            coin: addrData.coin,
+            getAddress: () => Promise.resolve(k),
+            destinationTag: v.tag
+          });
+        }
       });
       contactsList = _.orderBy(contactsList, 'name');
-      this.contactsList = contactsList.filter(c =>
-        this.filterIrrelevantRecipients(c)
-      );
+      this.contactsList = _.clone(contactsList);
+      // this.contactsList = contactsList.filter(c =>
+      //   this.filterIrrelevantRecipients(c)
+      // );
       let shortContactsList = _.clone(
         this.contactsList.slice(
           0,
@@ -270,7 +276,7 @@ export class TransferToPage {
           ? false
           : true;
     } else {
-      this.delayUpdateContactsList(this._delayTimeOut);
+      this.delayUpdateContactsList();
       this.filteredWallets = [];
       this.filteredWalletsByKeys = [];
     }
