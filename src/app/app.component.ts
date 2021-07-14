@@ -100,6 +100,7 @@ export class CopayApp {
     | typeof TabsPage
     | typeof FeatureEducationPage;
   private onResumeSubscription: Subscription;
+  private onPauseSubscription: Subscription;
   private isCopayerModalOpen: boolean;
   private copayerModal: any;
 
@@ -172,11 +173,8 @@ export class CopayApp {
 
   ngOnDestroy() {
     this.onResumeSubscription.unsubscribe();
-    if (this.iab) {
-      Object.keys(this.iab.refs).forEach(ref => {
-        this.iab.refs[ref].close();
-      });
-    }
+    this.onPauseSubscription.unsubscribe();
+    this.closeIAB();
   }
 
   initializeApp() {
@@ -291,9 +289,21 @@ export class CopayApp {
           });
       }
 
+      // Subscribe onPause
+      this.onPauseSubscription = this.platform.pause.subscribe(async () => {
+        // Since Biometric plugin put on Pause Android devices,
+        // it's needed to close all iab instances
+        if (this.platform.is('android') && this.iabCardProvider.isHidden)
+          this.closeIAB();
+      });
+
       // Subscribe Resume
       this.logger.debug('On Resume Subscription');
       this.onResumeSubscription = this.platform.resume.subscribe(async () => {
+        // Resume InAppBrowser (only Android)
+        if (this.platform.is('android') && this.iabCardProvider.isHidden)
+          this.initIAB();
+
         // Check PIN or Fingerprint on Resume
         this.openLockModal();
 
@@ -318,6 +328,9 @@ export class CopayApp {
       // Firebase Dynamic link
       this.dynamicLinksProvider.init();
     }
+
+    // Init InAppBrowser
+    this.initIAB();
 
     // Set Theme (light or dark mode)
     this.themeProvider.apply();
@@ -387,7 +400,17 @@ export class CopayApp {
             this.logsProvider.get(this.appProvider.info.nameCase, platform);
           });
       });
+  }
 
+  private closeIAB() {
+    if (this.iab) {
+      Object.keys(this.iab.refs).forEach(ref => {
+        this.iab.refs[ref].close();
+      });
+    }
+  }
+
+  private async initIAB() {
     let [token, cards]: any = await Promise.all([
       this.persistenceProvider.getBitPayIdPairingToken(Network[this.NETWORK]),
       this.persistenceProvider.getBitpayDebitCards(Network[this.NETWORK])
@@ -436,7 +459,7 @@ export class CopayApp {
               } catch(err) {
                 sendMessageToWallet({message: 'IABError', log: err});
               }   
-              })()`
+            })()`
           );
           this.iabCardProvider.init();
         } catch (err) {
