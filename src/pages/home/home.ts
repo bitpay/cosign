@@ -219,11 +219,6 @@ export class HomePage {
           this.bitPayIdUserInfo = user;
           if (user) {
             this.accountInitials = this.getBitPayIdInitials(user);
-            if (!this.bitPaySurveyCardChecked) {
-              this.persistenceProvider.getBitPayCardOrderStarted().then(ts => {
-                this.showBitPaySurveyCard(ts);
-              });
-            }
           }
         });
     }
@@ -241,6 +236,7 @@ export class HomePage {
     this.loadAds();
     this.fetchAdvertisements();
     this.fetchGiftCardAdvertisement();
+    this.checkBitPaySurveyCard();
     this.persistenceProvider.getDynamicLink().then((deepLink: string) => {
       if (deepLink) {
         this.persistenceProvider.setOnboardingFlowFlag('disabled');
@@ -1089,9 +1085,12 @@ export class HomePage {
       .join('');
   }
 
-  public openBitPaySurveyLink(): void {
-    const url = 'https://payux.typeform.com/to/PbI7b2ZB';
-    this.externalLinkProvider.open(url);
+  private checkBitPaySurveyCard() {
+    if (!this.bitPaySurveyCardChecked) {
+      this.persistenceProvider.getBitPayCardOrderStarted().then(ts => {
+        this.showBitPaySurveyCard(ts);
+      });
+    }
   }
 
   private async showBitPaySurveyCard(ts: number) {
@@ -1123,6 +1122,11 @@ export class HomePage {
     this.showSurveyCard = false;
     const now = moment().unix();
     this.persistenceProvider.setBitPaySurveyCardDismissed(now);
+  }
+
+  public openBitPaySurveyLink(): void {
+    const url = 'https://payux.typeform.com/to/PbI7b2ZB';
+    this.externalLinkProvider.open(url);
   }
 }
 
