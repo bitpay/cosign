@@ -800,27 +800,8 @@ export class ProfileProvider {
     });
   }
 
-  private async addAndBindWalletClients(
-    data,
-    opts = { bwsurl: null, keyId: null }
-  ): Promise<any> {
-    if (opts.keyId) {
-      // re-import attempt
-      if (this.checkIfCorrectWalletToReImport(opts.keyId, data.key)) {
-        const wallets = this.getWalletsFromGroup({
-          keyId: opts.keyId,
-          showHidden: true
-        });
-        await this.deleteWalletGroup(opts.keyId, wallets);
-        await this.keyProvider.removeKey(opts.keyId);
-      } else {
-        return Promise.reject(
-          this.translate.instant(
-            'The recovery phrase you entered do not match the wallet you are trying to re-import'
-          )
-        );
-      }
-    }
+  private addAndBindWalletClients(data, opts?): Promise<any> {
+    opts = opts || {};
     this.onGoingProcessProvider.pause();
     // Encrypt wallet
     return this.askToEncryptKey(data.key).then(() => {
@@ -837,9 +818,8 @@ export class ProfileProvider {
         this.setOrderedWalletsByGroup(); // Update Ordered Wallet List
         return this.storeProfileIfDirty()
           .then(() => {
-            return this.checkIfAlreadyExist(boundWalletClients).then(() => {
-              return Promise.resolve(_.compact(boundWalletClients));
-            });
+            this.checkIfAlreadyExist(boundWalletClients);
+            return Promise.resolve(_.compact(boundWalletClients));
           })
           .catch(err => {
             return Promise.reject('failed to bind wallets:' + err);
@@ -848,33 +828,39 @@ export class ProfileProvider {
     });
   }
 
-  private checkIfAlreadyExist(walletClients: any[]): Promise<any> {
-    return new Promise(resolve => {
-      const countInArray = _.filter(walletClients, item => item == undefined)
-        .length;
-      if (countInArray > 0) {
-        const msg1 = this.replaceParametersProvider.replace(
-          this.translate.instant('The wallet is already in the app'),
-          { nameCase: this.appProvider.info.nameCase }
-        );
-        const msg2 = this.replaceParametersProvider.replace(
-          this.translate.instant(
-            '{{countInArray}} of your wallets already exist in {{nameCase}}'
-          ),
-          {
-            countInArray,
-            nameCase: this.appProvider.info.nameCase
-          }
-        );
-        const msg = countInArray == 1 ? msg1 : msg2;
-        const title = this.translate.instant('Error');
-        this.errorsProvider.showDefaultError(msg, title, () => {
-          return resolve();
-        });
-      } else {
-        return resolve();
-      }
-    });
+  private checkIfAlreadyExist(walletClients: any[]): void {
+    const existentWallets = _.filter(walletClients, item => item == undefined)
+      .length;
+    const newWallets = walletClients.length - existentWallets;
+    if (existentWallets > 0) {
+      const msg1 = this.replaceParametersProvider.replace(
+        this.translate.instant('The wallet is already in the app'),
+        { nameCase: this.appProvider.info.nameCase }
+      );
+      const msg2 = this.replaceParametersProvider.replace(
+        this.translate.instant(
+          '{{existentWallets}} of your wallets already exist in {{nameCase}}'
+        ),
+        {
+          existentWallets,
+          nameCase: this.appProvider.info.nameCase
+        }
+      );
+      const msg3 = this.translate.instant('. Added a new wallet.');
+      const msg4 = this.replaceParametersProvider.replace(
+        this.translate.instant('. Added {{newWallets}} new wallets.'),
+        { newWallets }
+      );
+
+      let msg = existentWallets == 1 ? msg1 : msg2;
+      if (newWallets > 0) msg = newWallets == 1 ? msg + msg3 : msg + msg4;
+
+      const title =
+        newWallets > 0
+          ? this.translate.instant('Notice')
+          : this.translate.instant('Warning');
+      this.errorsProvider.showDefaultError(msg, title);
+    }
   }
 
   // Adds and bind a new client to the profile
@@ -988,8 +974,7 @@ export class ProfileProvider {
         });
       }
       return this.addAndBindWalletClients(data, {
-        bwsurl: opts.bwsurl,
-        keyId: opts.keyId
+        bwsurl: opts.bwsurl
       });
     });
   }
@@ -1010,8 +995,7 @@ export class ProfileProvider {
         });
       }
       return this.addAndBindWalletClients(data, {
-        bwsurl: opts.bwsurl,
-        keyId: opts.keyId
+        bwsurl: opts.bwsurl
       });
     });
   }
@@ -1035,9 +1019,8 @@ export class ProfileProvider {
       }
       return this.storeProfileIfDirty()
         .then(() => {
-          return this.countNewWallets(boundWalletClients).then(() => {
-            return Promise.resolve(_.compact(boundWalletClients));
-          });
+          this.countNewWallets(boundWalletClients);
+          return Promise.resolve(_.compact(boundWalletClients));
         })
         .catch(err => {
           return Promise.reject('failed to bind wallets:' + err);
@@ -1045,7 +1028,7 @@ export class ProfileProvider {
     });
   }
 
-  private async countNewWallets(walletClients: any[]): Promise<any> {
+  private countNewWallets(walletClients: any[]): void {
     let msg;
     const title = this.translate.instant('Sync completed');
     const newWalletsCount = _.compact(walletClients).length;
@@ -1066,10 +1049,7 @@ export class ProfileProvider {
       title,
       msg
     });
-    await infoSheet.present();
-    await Observable.timer(4000).toPromise();
-    infoSheet.dismiss();
-    return Promise.resolve();
+    infoSheet.present();
   }
 
   public importFile(str: string, opts): Promise<any> {
@@ -1098,11 +1078,8 @@ export class ProfileProvider {
           return this.addAndBindWalletClient(data.walletClient, {
             bwsurl: opts.bwsurl
           }).then(walletClient => {
-            return this.checkIfAlreadyExist([].concat(walletClient)).then(
-              () => {
-                return Promise.resolve(walletClient);
-              }
-            );
+            this.checkIfAlreadyExist([].concat(walletClient));
+            return Promise.resolve(walletClient);
           });
         });
       });
@@ -1404,11 +1381,8 @@ export class ProfileProvider {
                 bwsurl: opts.bwsurl
               })
                 .then(walletClient => {
-                  return this.checkIfAlreadyExist([].concat(walletClient)).then(
-                    () => {
-                      return resolve(walletClient);
-                    }
-                  );
+                  this.checkIfAlreadyExist([].concat(walletClient));
+                  return resolve(walletClient);
                 })
                 .catch(err => {
                   return reject(err);
